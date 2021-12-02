@@ -1,14 +1,13 @@
 import random
-from tkinter import messagebox
+
 class SudokuGame:
 
     def __init__(self):
         self.board = [[0 for i in range(9)] for j in range(9)]
         self.fixedPositions = []
-        self.Generate()
-        self.GenerateFixed()
 
-    def Rules(self, row, col, num):
+
+    def ThrowRules(self, row, col, num):
 
         # Check row
         for i in range(9):
@@ -33,6 +32,33 @@ class SudokuGame:
             if i[0] == row and i[1] == col:
                 return 4
 
+        return 0
+
+    def Rules(self, row, col, num):
+
+        # Check row
+        for i in range(9):
+            if self.board[row][i] == num:
+                return False
+
+        # Check column
+        for i in range(9):
+            if self.board[i][col] == num:
+                return False
+
+        # Check box
+        box_x = row // 3
+        box_y = col // 3
+
+        for i in range(box_x * 3, box_x * 3 + 3):
+            for j in range(box_y * 3, box_y * 3 + 3):
+                if self.board[i][j] == num:
+                    return False
+
+        for i in self.fixedPositions:
+            if i[0] == row and i[1] == col:
+                return False
+
         return True
 
     def Solve(self):
@@ -41,7 +67,8 @@ class SudokuGame:
             for j in range(9):
                 if self.board[i][j] == 0:
                     for num in range(1, 10):
-                        if self.Rules(i, j, num):
+                        posibilidades = self.Rules(i, j, num)
+                        if self.Rules(i, j, num) == True:
                             self.board[i][j] = num
                             if self.Solve():
                                 return True
@@ -71,7 +98,7 @@ class SudokuGame:
             self.board[row][col] = num
             return True
         else:
-            return False
+            return self.ThrowRules(row, col, num)
 
     def Valid(self):
         for i in range(9):
@@ -84,7 +111,7 @@ class SudokuGame:
 
         self.Solve()
 
-        max = random.randint(1, 8)
+        max = random.randint(1, 15)
 
         for i in range(9):
             for j in range(9):
@@ -104,18 +131,76 @@ class SudokuGame:
 
                     self.board[i][j] = 0
 
-        def Delete(self):
+    def Delete(self):
 
-            for i in range(9):
-                for j in range(9):
+        for i in range(9):
+            for j in range(9):
 
-                    for k in self.fixedPositions:
+                for k in self.fixedPositions:
 
-                        if i != k[0] and j != k[1]:
-                            self.board[i][j] = 0
-
-
+                    if i != k[0] and j != k[1]:
+                        self.board[i][j] = 0
 
 
-sudoku = SudokuGame()
-sudoku.Print()
+    def Hard(self):
+
+        self.fixedPositions = []
+
+        self.board =    [[8,0,0,0,0,0,0,0,0],
+                        [0,0,3,6,0,0,0,0,0],
+                        [0,7,0,0,9,0,2,0,0],
+                        [0,5,0,0,0,7,0,0,0],
+                        [0,0,0,0,4,5,7,0,0],
+                        [0,0,0,1,0,0,0,3,0],
+                        [0,0,1,0,0,0,0,6,8],
+                        [0,0,8,5,0,0,0,1,0],
+                        [0,9,0,0,0,0,4,0,0]]
+
+        for i in range(9):
+            for j in range(9):
+
+                if self.board[i][j] != 0:
+                    self.fixedPositions.append([i, j])
+
+
+    def Medium(self):
+
+        self.fixedPositions = []
+
+        self.board =    [[0,0,9,0,7,0,4,3,6],
+                        [0,0,0,3,8,0,0,0,0],
+                        [6,3,2,5,0,0,0,0,0],
+                        [7,6,3,8,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,0],
+                        [0,0,0,0,0,8,2,7,3],
+                        [0,0,0,0,0,0,0,0,0],
+                        [3,5,8,0,1,0,6,0,0]]
+
+        for i in range(9):
+            for j in range(9):
+
+                if self.board[i][j] != 0:
+                    self.fixedPositions.append([i, j])
+
+    def Easy(self):
+
+        self.fixedPositions = []
+
+        self.board = [[5,1,7,6,0,0,0,3,4],
+                       [2,8,9,0,0,4,0,0,0],
+                       [3,4,6,2,0,5,0,9,0],
+                       [6,0,2,0,0,0,0,1,0],
+                       [0,3,8,0,0,6,0,4,7],
+                       [0,0,0,0,0,0,0,0,0],
+                       [0,9,0,0,0,0,0,7,8],
+                       [7,0,3,4,0,0,5,6,0],
+                       [0,0,0,0,0,0,0,0,0]]
+
+        for i in range(9):
+            for j in range(9):
+
+                if self.board[i][j] != 0:
+                    self.fixedPositions.append([i, j])
+
+

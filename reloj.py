@@ -1,3 +1,4 @@
+import time
 class tiempo:
 
     def __init__(self):
@@ -16,30 +17,21 @@ class tiempo:
 
     def contraReloj(self):
 
-        while self.segundo != 0 and self.minuto != 0 and self.hora != 0:
+        self.segundo -= 1
 
-            self.segundo -= 1
+        if self.segundo == -1:
+            self.segundo = 59
+            self.minuto -= 1
 
-            if self.segundo == 0:
-                self.segundo = 59
-                self.minuto -= 1
+        if self.minuto == -1:
+            self.minuto = 59
+            self.hora -= 1
 
-            if self.minuto == 0:
-                self.minuto = 59
-                self.hora -= 1
-
-            if self.hora == 0:
-                self.hora = 23
-                self.minuto = 59
-                self.segundo = 59
-
-            time.sleep(1)
-
-            print("{}:{}:{}".format(self.hora, self.minuto, self.segundo))
+        print("{}:{}:{}".format(self.hora, self.minuto, self.segundo))
 
     def reloj(self):
 
-        while True:
+
 
             self.segundo += 1
 
@@ -56,6 +48,6 @@ class tiempo:
                 self.minuto = 0
                 self.segundo = 0
 
-            time.sleep(1)
-            
+            print("{}:{}:{}".format(self.hora, self.minuto, self.segundo))
+
 

@@ -15,6 +15,7 @@ La regla de este juego es que un mismo elemento no se puede repetir:
 - En las subcuadrículas (3x3)
 Además, los elementos que aparecen al inicio del juego quedan fijos, no se pueden cambiar.
 """
+import time
 from tkinter import *
 import tkinter as tk
 import random
@@ -23,33 +24,15 @@ from tkinter import *
 from tkinter import messagebox
 from Sudoku import *
 from jugadas import *
-
-frame=Tk()
-frame.resizable(0,0)
-frame.geometry("1080x1080")
-frame.title("SUDOKU FUENTES")
-menu=Menu(frame)
-file=Menu(menu)
-file.add_command(label="Salir", command=frame.quit)
-file.add_command(label="Nivel Facil")
-file.add_command(label="Nivel Facil Resuelto")
-file.add_command(label="Nivel Dificil")
-file.add_command(label="Nivel Dificil Resuelto")
-
-
-menu.add_cascade(label="Niveles (Facil o Dificil)", menu=file)
-frame.config(menu=menu)
-
-ingame = False
-sudoku = SudokuGame()
-posi, posj = None, None
-board = []
-listaJugadas = Jugadas()
+from reloj import *
+import threading
+import json
+import os
 
 
 #Se inicia el juego
 def start():
-    global ingame
+    global ingame, dicConfiguracion
 
     if ingame:
         return
@@ -59,29 +42,69 @@ def start():
         ingame = False
         return
 
+    dicConfiguracion = CargarConfiguracion()
+
+    if dicConfiguracion["opcionG"] == 1:
+        hilo = threading.Thread(target=CorrerTiempo, args=(False,)).start()
+    elif dicConfiguracion["opcionG"] == 3:
+        hilo = threading.Thread(target=CorrerTiempo, args=(True,)).start()
+    else:
+        reloj.config(text="Tiempo: Sin tiempo")
+
+    if dicConfiguracion["opcionP"] == 1:
+        sudoku.Easy()
+    elif dicConfiguracion["opcionP"] == 2:
+        sudoku.Medium()
+    elif dicConfiguracion["opcionP"] == 3:
+        sudoku.Hard()
+    else:
+        sudoku.GenerateFixed()
+
     for i in range(len(board)):
         for j in range(len(board[i])):
             board[i][j].config(text = str(sudoku.board[i][j]))
 
-
 #Funcion que borra el juego
 def BorrarJuego():
     if ingame:
-        sudoku.Delete()
 
         for i in range(len(board)):
             for j in range(len(board[i])):
-                board[i][j].config(text = str(sudoku.board[i][j]))
+
+                flag = False
+
+                for k in sudoku.fixedPositions:
+                    if i == k[0] and j == k[1]:
+                        flag = True
+
+                if not flag:
+
+                    board[i][j].config(text = str(0))
+                    sudoku.board[i][j] = 0
+
 
 #Funcion para el top
 def TopX():
+
+    global ingame, sudoku, listaJugadas
+
     if ingame:
-        return
+        sudoku.Solve()
+
+        for i in range(len(board)):
+            for j in range(len(board[i])):
+
+                board[i][j].config(text = str(sudoku.board[i][j]))
+
+        messagebox.showinfo("Completa", "Se ha completado el sudoku automanticamente")
+
+        ingame = False
+        Tiempo = tiempo()
+        listaJugadas = Jugadas()
 
 #Funcion para rehacer jugado
 def RehacerJugada():
     if ingame:
-        listaJugadas.Rehacer()
         numeros = listaJugadas.Rehacer()
         if numeros != None:
             posi, posj, num = numeros
@@ -99,24 +122,95 @@ def deshacerjugada():
 
 #Funcion para terminar juego
 def TerminarJuego():
+
+    global ingame, sudoku, listaJugadas
+
     if ingame:
-        return
+        opcion = messagebox.askquestion("Terminar", "Quieres terminar el juego?")
+
+        if opcion == "yes":
+            Tiempo = tiempo()
+            ingame = False
+            sudoku = SudokuGame()
+            for i in range(len(board)):
+                for j in range(len(board[i])):
+                    board[i][j].config(text = str(sudoku.board[i][j]))
+            listaJugadas = Jugadas()
 
 def GuardarJuego():
     if ingame:
-        return
+
+        tablero = sudoku.board
+        casillas = sudoku.fixedPositions
+        deshacerlista = listaJugadas.jugadasDeshacer
+        rehacerlista = listaJugadas.jugadasRehacer
+        nombre = entrada_nombre.get()
+        hora = Tiempo.hora
+        minuto = Tiempo.minuto
+        segundo = Tiempo.segundo
+        modo = dicConfiguracion["opcionG"]
+
+        dicJuego = {"tablero": tablero, "casillas": casillas, "deshacerlista": deshacerlista, "rehacerlista": rehacerlista, "nombre": nombre, "hora": hora, "minuto": minuto, "segundo": segundo, "modo": modo}
+
+        archivo = open('sudokujuegoactual.json', 'w')
+        archivo.write(json.dumps(dicJuego))
+        archivo.close()
+
+def CargarJuego():
+
+    global ingame, sudoku, listaJugadas, Tiempo
+
+    ingame = True
+
+    if ingame:
+
+        dicJuego = {}
+        try:
+
+            archivo = open('sudokujuegoactual.json', 'r')
+            dicJuego = json.load(archivo)
+            archivo.close()
+
+        except:
+            pass
+
+        ingame = True
+
+        sudoku.board = dicJuego["tablero"]
+        sudoku.fixedPositions = dicJuego["casillas"]
+        listaJugadas.jugadasDeshacer = dicJuego["deshacerlista"]
+        listaJugadas.jugadasRehacer = dicJuego["rehacerlista"]
+        entrada_nombre.set(dicJuego["nombre"])
+        Tiempo.hora = dicJuego["hora"]
+        Tiempo.minuto = dicJuego["minuto"]
+        Tiempo.segundo = dicJuego["segundo"]
+        dicConfiguracion["opcionG"] = dicJuego["modo"]
+
+        if dicConfiguracion["opcionG"] == 1:
+            hilo = threading.Thread(target=CorrerTiempo, args=(False,)).start()
+        elif dicConfiguracion["opcionG"] == 3:
+            hilo = threading.Thread(target=CorrerTiempo, args=(True,)).start()
+        else:
+            reloj.config(text="Tiempo: Sin tiempo")
+
+        for i in range(len(board)):
+            for j in range(len(board[i])):
+                board[i][j].config(text = str(sudoku.board[i][j]))
+
 
 def btnCommand(i, j):
 
     global posi, posj
 
     if ingame:
-
+        board[posi][posj].config(bg = "light blue")
         posi, posj = i, j
+        board[i][j].config(bg = "red")
+
 
 def btnCommand2(num):
 
-    global ingame,listaJugadas
+    global ingame,listaJugadas, Tiempo
 
     if ingame:
 
@@ -124,12 +218,14 @@ def btnCommand2(num):
 
         if action == True:
 
+            board[posi][posj].config(bg="light blue")
             listaJugadas.AgregarDeshacer(posi, posj, num)
             board[posi][posj].config(text=str(num))
             sudoku.Print()
 
             if sudoku.Valid():
 
+                Tiempo = tiempo()
                 listaJugadas = Jugadas()
                 messagebox.showinfo("Felicidades", "Felicidades has ganado")
                 ingame = False
@@ -151,10 +247,155 @@ def btnCommand2(num):
 
             messagebox.showinfo("Error", "Este numero es casilla fija")
 
+def CorrerTiempo(flag):
 
-colourTxt="black"
-#-----------------------------Codigo principal------------------
-#En esta parte desarrollamos lo que va en la ventana principal
+    global dicConfiguracion, ingame
+
+    if flag:
+
+        Tiempo.hora = dicConfiguracion["horas"]
+        Tiempo.minuto = dicConfiguracion["minutos"]
+        Tiempo.segundo = dicConfiguracion["segundos"]
+
+
+    while ingame:
+
+        if flag:
+
+            if Tiempo.hora == 0 and Tiempo.minuto == 0 and Tiempo.segundo == 0:
+                messagebox.showinfo("Tiempo", "Se ha acabado el tiempo")
+                ingame = False
+                return
+
+            Tiempo.contraReloj()
+        else:
+            Tiempo.reloj()
+
+        reloj.config(text="Tiempo: " + str(Tiempo.hora) + ":" + str(Tiempo.minuto) + ":" + str(Tiempo.segundo))
+
+        time.sleep(1)
+
+def GuardarConfiguracion(h,m,s,opcionG,opcionP):
+
+    global dicConfiguracion
+
+    try:
+        #convertimos las variables a enteros
+        h = int(h)
+        m = int(m)
+        s = int(s)
+
+        #verificamos que los valores sean correctos
+        if h < 0 or h > 99 and m < 0 or m > 59 and s < 0 or s > 59:
+            messagebox.showerror("Error", "Error al guardar la configuracion")
+            return
+
+        #guardamos la configuracion
+        archivo = open('sudoku2021configuracion.json', 'w')
+        archivo.write(json.dumps({"horas":h,"minutos":m,"segundos":s,"opcionG":opcionG,"opcionP":opcionP}))
+        archivo.close()
+
+        dicConfiguracion = CargarConfiguracion()
+
+        messagebox.showinfo("Guardado", "Configuracion guardada")
+
+    except:
+
+        messagebox.showerror("Error", "Error al guardar la configuracion")
+
+def CargarConfiguracion():
+
+    try:
+        #cargarmos la configuracion para retornarla
+        archivo = open('sudoku2021configuracion.json', 'r')
+        dic = json.load(archivo)
+        archivo.close()
+
+        return dic
+
+    except:
+
+        pass
+
+def Configuracion():
+
+
+    #Generamos la interfaz grafica para la zona de configuracion
+
+
+    canvasPantalla = Canvas()
+    canvasPantalla.place(x=0, y=0)
+    canvasPantalla.config(bg="cyan2")
+    canvasPantalla.config(width="1010", height="740")
+    canvasPantalla.config(bd=35)
+    canvasPantalla.config(relief="groove")
+
+    canvasPantalla.place(x=0, y=0)
+
+
+    titulo = Label(canvasPantalla, text="Configuración", font=("Arial", 20), bg="cyan2", fg="Black")
+    titulo.place(x=470, y=100)
+
+    opcionGame = IntVar()
+
+    canvasOpciones = Canvas(canvasPantalla, width=200, height=200, bg="White",highlightcolor = "black", highlightbackground = "black")
+    canvasOpciones.place(x=350, y=200)
+
+    radioTimer = Radiobutton(canvasOpciones, text="Timer", variable=opcionGame, value=1, bg ="White")
+    radioTimer.grid(row=0, column=0,padx=7,pady=7)
+    radioNoTimer = Radiobutton(canvasOpciones, text="No Timer", variable=opcionGame, value=2, bg ="White")
+    radioNoTimer.grid(row=1, column=0,padx=7,pady=7)
+    radioContra = Radiobutton(canvasOpciones, text="Contra Reloj", variable=opcionGame, value=3, bg ="White")
+    radioContra.grid(row=2, column=0,padx=7,pady=7)
+
+    labelHoras = Label(canvasOpciones, text="Horas:", bg ="White")
+    labelHoras.grid(row=0, column=1,padx=7,pady=7)
+    entryHoras = Entry(canvasOpciones, width=5, bg ="White")
+    entryHoras.insert(0,"0")
+    entryHoras.grid(row=0, column=2,padx=7,pady=7)
+    labelMinutos = Label(canvasOpciones, text="Minutos:", bg ="White")
+    labelMinutos.grid(row=1, column=1,padx=7,pady=7)
+    entryMinutos = Entry(canvasOpciones, width=5, bg ="White")
+    entryMinutos.grid(row=1, column=2,padx=7,pady=7)
+    entryMinutos.insert(0,"0")
+    labelSegundos = Label(canvasOpciones, text="Segundos:", bg ="White")
+    labelSegundos.grid(row=2, column=1,padx=7,pady=7)
+    entrySegundos = Entry(canvasOpciones, width=5, bg ="White")
+    entrySegundos.grid(row=2, column=2,padx=7,pady=7)
+    entrySegundos.insert(0,"0")
+
+    opcionDif = IntVar()
+
+    labelFacil = Label(canvasOpciones, text="Facil", bg ="White")
+    labelFacil.grid(row=0, column=3,padx=7,pady=7)
+
+    radioFacil = Radiobutton(canvasOpciones, text="Facil", variable=opcionDif, value=1, bg ="White")
+    radioFacil.grid(row=0, column=4,padx=7,pady=7)
+
+    labelMedio = Label(canvasOpciones, text="Medio", bg ="White")
+    labelMedio.grid(row=1, column=3,padx=7,pady=7)
+
+    radioMedio = Radiobutton(canvasOpciones, text="Medio", variable=opcionDif, value=2, bg ="White")
+    radioMedio.grid(row=1, column=4,padx=7,pady=7)
+
+    labelDificil = Label(canvasOpciones, text="Dificil", bg ="White")
+    labelDificil.grid(row=2, column=3,padx=7,pady=7)
+
+    radioDificil = Radiobutton(canvasOpciones, text="Dificil", variable=opcionDif, value=3, bg ="White")
+    radioDificil.grid(row=2, column=4,padx=7,pady=7)
+
+    labelAutomatico = Label(canvasOpciones, text="Automatico", bg ="White")
+    labelAutomatico.grid(row=3, column=3,padx=7,pady=7)
+
+    radioAutomatico = Radiobutton(canvasOpciones, text="Automatico", variable=opcionDif, value=4, bg ="White")
+    radioAutomatico.grid(row=3, column=4,padx=7,pady=7)
+
+    botonAceptar = Button(canvasOpciones, text="Aceptar", bg="White", command = lambda : GuardarConfiguracion(entryHoras.get(), entryMinutos.get(), entrySegundos.get(), opcionGame.get(), opcionDif.get()))
+    botonAceptar.grid(row=4, column=0,padx=7,pady=7)
+
+    frame.mainloop()
+
+
 def jugar():
 
     global ingame, board, entrada_nombre, reloj, canvasPantalla, gameArea, pause, gameArea2
@@ -485,9 +726,9 @@ def jugar():
     botonDeshacer.grid(row=0, column=2, padx=10, pady=10)
 
     botonBorrar = Button(canvasBotones, text="Borrar Juego", command=lambda: BorrarJuego(), bg="slateGray2", width=12)
-    botonBorrar.grid(row=0, column=3, padx=10, pady=10)
+    botonBorrar.grid(row=1, column=1, padx=10, pady=10)
 
-    botonTopx = Button(canvasBotones, text="Top X", command=lambda: TopX(), bg="slateGray2", width=12)
+    botonTopx = Button(canvasBotones, text="Resolver", command=lambda: TopX(), bg="slateGray2", width=12)
     botonTopx.grid(row=0, column=3, padx=10, pady=10)
 
     botonRehacer = Button(canvasBotones, text="Rehacer Jugada", command=lambda: RehacerJugada(), bg="slateGray2", width=12)
@@ -499,13 +740,81 @@ def jugar():
     botonGuardar = Button(canvasBotones, text="Guardar Juego", command=lambda: GuardarJuego(),bg="slateGray2", width=12)
     botonGuardar.grid(row=2, column=2, padx=10, pady=10)
 
-    CargarJuego = Button(canvasBotones, text="Cargar Juego", command=lambda: CargarJuego(), bg="slateGray2", width=12)
-    CargarJuego.grid(row=2, column=3, padx=10, pady=10)
+    botonCargarJuego = Button(canvasBotones, text="Cargar Juego", command=lambda: CargarJuego(), bg="slateGray2", width=12)
+    botonCargarJuego.grid(row=2, column=3, padx=10, pady=10)
+
+    reloj = Label(canvasPantalla, text="Tiempo: ",bg = "cyan2")
+    reloj.place(x=450, y=630)
+
+def About():
+
+    canvasPantalla = Canvas()
+    canvasPantalla.place(x=0, y=0)
+    canvasPantalla.config(bg="cyan2")
+    canvasPantalla.config(width="1010", height="740")
+    canvasPantalla.config(bd=35)
+    canvasPantalla.config(relief="groove")
+
+    canvasPantalla.place(x=0, y=0)
+
+    canvasOpciones = Canvas(canvasPantalla, width=200, height=200, bg="White", highlightcolor="black",
+                           highlightbackground="black")
+    canvasOpciones.place(x=250, y=170)
+
+    titulo = Label(canvasOpciones, text="Acerca de", font=("Arial", 15), bg="white", fg="Black", anchor='n')
+    titulo.grid(row=0, column=0, padx=7, pady=7)
+
+    texto = Label(canvasOpciones, text="Juego 2048", font=("Arial", 15), bg="white", fg="Black", anchor='center')
+    texto.grid(row=1, column=0, padx=7, pady=7)
+
+    autor = Label(canvasOpciones, text="Autor: Anthony", font=("Arial", 15), bg="white", fg="Black", anchor='center')
+    autor.grid(row=2, column=0, padx=7, pady=7)
+
+    version = Label(canvasOpciones, text="Version: 1.0", font=("Arial", 15), bg="white", fg="Black", anchor='center')
+    version.grid(row=3, column=0, padx=7, pady=7)
+
+    texto2 = Label(canvasOpciones, text="Este juego fue creado para el curso de Taller de programación",
+                   anchor='center', font=("Arial", 15), bg="white", fg="Black")
+    texto2.grid(row=4, column=0, padx=7, pady=7)
+
+    texto3 = Label(canvasOpciones, text="Tecnologico de Costa Rica", font=("Arial", 15), bg="white", fg="Black",
+                   anchor='center')
+    texto3.grid(row=5, column=0, padx=7, pady=7)
+
+    fecha = Label(canvasOpciones, text="Fecha: 1/12/2021", font=("Arial", 15), bg="white", fg="Black", anchor='center')
+    fecha.grid(row=6, column=0, padx=7, pady=7)
 
 
+frame=Tk()
+frame.resizable(0,0)
+frame.geometry("1080x1080")
+frame.title("SUDOKU FUENTES")
 
+barraMenu = Menu(frame)
 
+mnuJugar = Menu(barraMenu)
+mnuConfigurar = Menu(barraMenu)
+mnuAbout = Menu(barraMenu)
+mnuManual = Menu(barraMenu)
+mnuSalir = Menu(barraMenu)
 
+barraMenu.add_command(label="Jugar", command = lambda : jugar())
+barraMenu.add_command(label="Configurar", command= lambda  : Configuracion())
+barraMenu.add_command(label="Manual", command= lambda  : os.popen("aquivaelnombre.pdf"))
+barraMenu.add_command(label="About", command= lambda  : About())
+barraMenu.add_command(label="Salir", command= lambda  : frame.destroy())
+
+frame.config(menu=barraMenu)
+
+dicConfiguracion = CargarConfiguracion()
+
+ingame = False
+sudoku = SudokuGame()
+Tiempo = tiempo()
+posi, posj = 0,0
+colourTxt="black"
+board = []
+listaJugadas = Jugadas()
 
 jugar()
 frame.mainloop()
